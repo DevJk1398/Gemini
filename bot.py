@@ -5,7 +5,6 @@ from flask import Flask
 import threading
 import os
 from dotenv import load_dotenv
-import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -29,26 +28,54 @@ app = Flask(__name__)
 def home():
     return "Bot is alive!"
 
+# Set to keep track of active channels
+active_channels = set()
+
 # Bot events
 @bot.event
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
 
-# Bot commands
-@bot.command(name='ask')
-async def ask_gemini(ctx, *, question):
-    try:
-        # Generate response from Gemini
-        response = model.generate_content(question)
-        # Send response (split if too long)
-        if len(response.text) > 2000:
-            parts = [response.text[i:i+2000] for i in range(0, len(response.text), 2000)]
-            for part in parts:
-                await ctx.send(part)
-        else:
-            await ctx.send(response.text)
-    except Exception as e:
-        await ctx.send(f"Error: {str(e)}")
+# Command to enable bot responses in a channel
+@bot.command(name='berry')
+async def berry_on(ctx, arg):
+    if arg.lower() == 'on':
+        active_channels.add(ctx.channel.id)
+        await ctx.send("Berry is now active in this channel! I'll respond to all messages here.")
+    elif arg.lower() == 'off':
+        active_channels.discard(ctx.channel.id)
+        await ctx.send("Berry is now off in this channel. I won't respond to messages here unless activated again.")
+    else:
+        await ctx.send("Please use `!berry on` to enable or `!berry off` to disable responses in this channel.")
+
+# Handle messages
+@bot.event
+async def on_message(message):
+    # Ignore messages from the bot itself
+    if message.author == bot.user:
+        return
+
+    # Process commands first
+    await bot.process_commands(message)
+
+    # Check if message is in DMs or an active channel
+    if isinstance(message.channel, discord.DMChannel) or message.channel.id in active_channels:
+        # Skip if message is a command
+        if message.content.startswith('!'):
+            return
+        
+        try:
+            # Generate response from Gemini
+            response = model.generate_content(message.content)
+            # Send response (split if too long)
+            if len(response.text) > 2000:
+                parts = [response.text[i:i+2000] for i in range(0, len(response.text), 2000)]
+                for part in parts:
+                    await message.channel.send(part)
+            else:
+                await message.channel.send(response.text)
+        except Exception as e:
+            await message.channel.send(f"Error: {str(e)}")
 
 # Function to run Flask app
 def run_flask():
