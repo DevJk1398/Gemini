@@ -2,9 +2,12 @@ from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import aiohttp
 import asyncio
+import os
 
 app = Flask(__name__)
-COC_API_TOKEN = "your_coc_api_token"
+
+# Get API token from environment variable
+COC_API_TOKEN = os.getenv("COC_API_TOKEN")
 COC_PROXY = "https://cocproxy.royaleapi.dev"
 
 async def fetch_player(tag):
@@ -24,20 +27,26 @@ def whatsapp():
         parts = incoming_msg.split()
         if len(parts) == 2:
             tag = parts[1]
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            data = loop.run_until_complete(fetch_player(tag))
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                data = loop.run_until_complete(fetch_player(tag))
 
-            if "name" in data:
-                msg.body(f"🏆 {data['name']} | TH: {data.get('townHallLevel')} | Trophies: {data.get('trophies')}")
-            else:
-                msg.body("❌ Player not found. Check the tag.")
+                if "name" in data:
+                    name = data.get("name")
+                    town_hall = data.get("townHallLevel")
+                    trophies = data.get("trophies")
+                    msg.body(f"🏆 {name} | TH: {town_hall} | Trophies: {trophies}")
+                else:
+                    msg.body("❌ Player not found. Please check the tag.")
+            except Exception as e:
+                msg.body("⚠️ Error fetching player data.")
         else:
             msg.body("Usage: /player #TAG")
     else:
-        msg.body("👋 Welcome to CoC Bot! Use /player #TAG to get started.")
+        msg.body("👋 Welcome to Clash Bot!\nUse /player #TAG to get player info.")
 
     return str(response)
 
 if __name__ == "__main__":
-    app.run(port=5000)
+    app.run(host="0.0.0.0", port=5000)
