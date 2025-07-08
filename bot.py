@@ -16,10 +16,10 @@ PORT = int(os.getenv("PORT", 5000))
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# Set up Discord bot
+# Set up Discord bot with no command prefix
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='', intents=intents, case_insensitive=True)
 
 # Set up Flask app
 app = Flask(__name__)
@@ -37,16 +37,16 @@ async def on_ready():
     print(f'{bot.user} has connected to Discord!')
 
 # Command to enable bot responses in a channel
-@bot.command(name='berry')
-async def berry_on(ctx, arg):
-    if arg.lower() == 'on':
-        active_channels.add(ctx.channel.id)
-        await ctx.send("Berry is now active in this channel! I'll respond to all messages here.")
-    elif arg.lower() == 'off':
-        active_channels.discard(ctx.channel.id)
-        await ctx.send("Berry is now off in this channel. I won't respond to messages here unless activated again.")
-    else:
-        await ctx.send("Please use `!berry on` to enable or `!berry off` to disable responses in this channel.")
+@bot.command(name='berry on')
+async def berry_on(ctx):
+    active_channels.add(ctx.channel.id)
+    await ctx.send("Berry is now active in this channel! I'll respond to all messages here.")
+
+# Command to disable bot responses in a channel
+@bot.command(name='berry off')
+async def berry_off(ctx):
+    active_channels.discard(ctx.channel.id)
+    await ctx.send("Berry is now off in this channel. I won't respond to messages here unless activated again.")
 
 # Handle messages
 @bot.event
@@ -60,8 +60,8 @@ async def on_message(message):
 
     # Check if message is in DMs or an active channel
     if isinstance(message.channel, discord.DMChannel) or message.channel.id in active_channels:
-        # Skip if message is a command
-        if message.content.startswith('!'):
+        # Skip if message is a command ("berry on" or "berry off")
+        if message.content.lower() in ['berry on', 'berry off']:
             return
         
         try:
